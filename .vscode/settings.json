@@ -2,7 +2,7 @@
   "editor.tabSize": 2,
   "editor.inlineSuggest.enabled": true,
   "editor.wordWrap": "bounded",
-  "editor.wordWrapColumn": 96,
+  "editor.wordWrapColumn": 80,
   "json.validate.enable": true,
   "editor.formatOnSave": true,
   "editor.formatOnType": true,
