@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{Ok, Result};
+use anyhow::{Ok, Result, anyhow};
 
 use crate::models::{DBState, Epic, Status, Story};
 
@@ -10,21 +10,84 @@ pub struct JiraDatabase {
 }
 
 impl JiraDatabase {
-    pub fn new(file_path: String) -> Self { todo!() }
+    pub fn new(file_path: String) -> Self {
+        Self { database: Box::new(JSONFileDatabase { file_path: file_path.into() }) }
+    }
 
-    pub fn read(&self) -> Result<DBState> { todo!() }
+    pub fn read(&self) -> Result<DBState> { self.database.read() }
 
-    pub fn create_epic(&self, epic: Epic) -> Result<u32> { todo!() }
+    pub fn create_epic(&self, epic: Epic) -> Result<u32> {
+        let mut db_state = self.database.read()?;
 
-    pub fn create_story(&self, story: Story, epic_id: u32) -> Result<u32> { todo!() }
+        db_state.last_item_id += 1;
+        let epic_id = db_state.last_item_id;
 
-    pub fn delete_epic(&self, epic_id: u32) -> Result<()> { todo!() }
+        db_state.epics.insert(epic_id, epic);
 
-    pub fn delete_story(&self, epic_id: u32, story_id: u32) -> Result<()> { todo!() }
+        self.database.write(&db_state)?;
 
-    pub fn update_epic_status(&self, epic_id: u32, status: Status) -> Result<()> { todo!() }
+        Ok(epic_id)
+    }
 
-    pub fn update_story_status(&self, story_id: u32, status: Status) -> Result<()> { todo!() }
+    pub fn create_story(&self, story: Story, epic_id: u32) -> Result<u32> {
+        let mut db_state = self.database.read()?;
+        if let Some(epic) = db_state.epics.get_mut(&epic_id) {
+            db_state.last_item_id += 1;
+
+            let story_id = db_state.last_item_id;
+            db_state.stories.insert(story_id, story);
+            epic.stories.push(story_id);
+
+            self.database.write(&db_state)?;
+            Ok(story_id)
+        } else {
+            Err(anyhow!("Epic with id {epic_id} not found"))
+        }
+    }
+
+    pub fn delete_epic(&self, epic_id: u32) -> Result<()> {
+        let mut db_state = self.database.read()?;
+
+        if let Some(epic) = db_state.epics.get_mut(&epic_id) {
+            Ok(())
+        } else {
+            Err(anyhow!("Epic with id {epic_id} not found"))
+        }
+    }
+
+    pub fn delete_story(&self, epic_id: u32, story_id: u32) -> Result<()> {
+        let mut db_state = self.database.read()?;
+
+        if let Some(epic) = db_state.epics.get_mut(&epic_id) {
+            if let Some(story) = db_state.stories.get_mut(&story_id) {
+                Ok(())
+            } else {
+                Err(anyhow!("Story with id {story_id} not found"))
+            }
+        } else {
+            Err(anyhow!("Epic with id {epic_id} not found"))
+        }
+    }
+
+    pub fn update_epic_status(&self, epic_id: u32, status: Status) -> Result<()> {
+        let mut db_state = self.database.read()?;
+
+        if let Some(epic) = db_state.epics.get_mut(&epic_id) {
+            Ok(())
+        } else {
+            Err(anyhow!("Epic with id {epic_id} not found"))
+        }
+    }
+
+    pub fn update_story_status(&self, story_id: u32, status: Status) -> Result<()> {
+        let mut db_state = self.database.read()?;
+
+        if let Some(story) = db_state.stories.get_mut(&story_id) {
+            Ok(())
+        } else {
+            Err(anyhow!("Story with id {story_id} not found"))
+        }
+    }
 }
 
 trait Database {
