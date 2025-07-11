@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{Ok, Result, anyhow};
+use anyhow::{Context, Ok, Result, anyhow};
 
 use crate::models::{DBState, Epic, Status, Story};
 
@@ -14,79 +14,97 @@ impl JiraDatabase {
         Self { database: Box::new(JSONFileDatabase { file_path: file_path.into() }) }
     }
 
-    pub fn read(&self) -> Result<DBState> { self.database.read() }
+    pub fn read(&self) -> Result<DBState> {
+        self.database.read().context("Failed to read from database")
+    }
 
     pub fn create_epic(&self, epic: Epic) -> Result<u32> {
-        let mut db_state = self.database.read()?;
+        let mut db_state = self.database.read().context("Failed to read from database")?;
 
         db_state.last_item_id += 1;
         let epic_id = db_state.last_item_id;
 
         db_state.epics.insert(epic_id, epic);
-
-        self.database.write(&db_state)?;
+        self.database.write(&db_state).context("Failed to write to database")?;
 
         Ok(epic_id)
     }
 
     pub fn create_story(&self, story: Story, epic_id: u32) -> Result<u32> {
-        let mut db_state = self.database.read()?;
-        if let Some(epic) = db_state.epics.get_mut(&epic_id) {
-            db_state.last_item_id += 1;
+        let mut db_state = self.database.read().context("Failed to read from database")?;
 
-            let story_id = db_state.last_item_id;
-            db_state.stories.insert(story_id, story);
-            epic.stories.push(story_id);
+        let epic = db_state
+            .epics
+            .get_mut(&epic_id)
+            .ok_or_else(|| anyhow!("Epic with id {epic_id} not found"))?;
 
-            self.database.write(&db_state)?;
-            Ok(story_id)
-        } else {
-            Err(anyhow!("Epic with id {epic_id} not found"))
-        }
+        db_state.last_item_id += 1;
+        let story_id = db_state.last_item_id;
+
+        db_state.stories.insert(story_id, story);
+        epic.stories.push(story_id);
+
+        self.database.write(&db_state).context("Failed to write to database")?;
+        Ok(story_id)
     }
 
     pub fn delete_epic(&self, epic_id: u32) -> Result<()> {
-        let mut db_state = self.database.read()?;
+        let mut db_state = self.database.read().context("Failed to read from database")?;
+        let epic = db_state
+            .epics
+            .get(&epic_id)
+            .ok_or_else(|| anyhow!("Epic with id {epic_id} not found"))?;
 
-        if let Some(epic) = db_state.epics.get_mut(&epic_id) {
-            Ok(())
-        } else {
-            Err(anyhow!("Epic with id {epic_id} not found"))
+        for story_id in &epic.stories {
+            db_state.stories.remove(story_id);
         }
+
+        db_state.epics.remove(&epic_id);
+
+        self.database.write(&db_state).context("Failed to write to database")
     }
 
     pub fn delete_story(&self, epic_id: u32, story_id: u32) -> Result<()> {
-        let mut db_state = self.database.read()?;
+        let mut db_state = self.database.read().context("Failed to read from database")?;
 
-        if let Some(epic) = db_state.epics.get_mut(&epic_id) {
-            if let Some(story) = db_state.stories.get_mut(&story_id) {
-                Ok(())
-            } else {
-                Err(anyhow!("Story with id {story_id} not found"))
-            }
-        } else {
-            Err(anyhow!("Epic with id {epic_id} not found"))
+        let epic = db_state
+            .epics
+            .get_mut(&epic_id)
+            .ok_or_else(|| anyhow!("Epic with id {epic_id} not found"))?;
+
+        if !db_state.stories.contains_key(&story_id) {
+            return Err(anyhow!("Story with id {story_id} not found"));
         }
+
+        epic.stories.retain(|&id| id != story_id);
+        db_state.stories.remove(&story_id);
+
+        self.database.write(&db_state).context("Failed to write to database")
     }
 
     pub fn update_epic_status(&self, epic_id: u32, status: Status) -> Result<()> {
-        let mut db_state = self.database.read()?;
+        let mut db_state = self.database.read().context("Failed to read from database")?;
 
-        if let Some(epic) = db_state.epics.get_mut(&epic_id) {
-            Ok(())
-        } else {
-            Err(anyhow!("Epic with id {epic_id} not found"))
-        }
+        let epic = db_state
+            .epics
+            .get_mut(&epic_id)
+            .ok_or_else(|| anyhow!("Epic with id {epic_id} not found"))?;
+
+        epic.status = status;
+
+        self.database.write(&db_state).context("Failed to write to database")
     }
 
     pub fn update_story_status(&self, story_id: u32, status: Status) -> Result<()> {
-        let mut db_state = self.database.read()?;
+        let mut db_state = self.database.read().context("Failed to read from database")?;
 
-        if let Some(story) = db_state.stories.get_mut(&story_id) {
-            Ok(())
-        } else {
-            Err(anyhow!("Story with id {story_id} not found"))
-        }
+        let story = db_state
+            .stories
+            .get_mut(&story_id)
+            .ok_or_else(|| anyhow!("Story with id {} not found", story_id))?;
+
+        story.status = status;
+        self.database.write(&db_state).context("Failed to write to database")
     }
 }
 
@@ -414,6 +432,10 @@ pub mod test_utils {
                 }),
             }
         }
+    }
+
+    impl Default for MockDB {
+        fn default() -> Self { Self::new() }
     }
 
     impl Database for MockDB {
