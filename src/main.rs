@@ -1,3 +1,5 @@
+mod models;
+
 fn main() {
-    println!("Hello");
+    println!("Welcome To My-Jira!");
 }
