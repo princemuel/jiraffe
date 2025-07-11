@@ -6,8 +6,8 @@ Jiraffe is a [Jira][jira] clone for the terminal.
 
 ## Features
 
-1. Epic CRUD
-2. Story CRUD
+- Epic CRUD
+- Story CRUD
 
 ![jira-gif](./assets/jira-cli.gif)
 
