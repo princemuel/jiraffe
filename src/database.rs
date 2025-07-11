@@ -119,12 +119,26 @@ struct JSONFileDatabase {
 
 impl Database for JSONFileDatabase {
     fn read(&self) -> Result<DBState> {
-        let content = fs::read_to_string(&self.file_path)?;
-        Ok(serde_json::from_str(&content)?)
+        let content = fs::read_to_string(&self.file_path)
+            .with_context(|| format!("Failed to read file: {}", self.file_path.display()))?;
+
+        serde_json::from_str(&content).with_context(|| {
+            format!("Failed to parse JSON from file: {}", self.file_path.display())
+        })
     }
 
     fn write(&self, data: &DBState) -> Result<()> {
-        fs::write(&self.file_path, &serde_json::to_vec(data)?)?;
+        if let Some(parent) = self.file_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let json_data =
+            serde_json::to_vec_pretty(data).context("Failed to serialize data to JSON")?;
+
+        fs::write(&self.file_path, json_data).with_context(|| {
+            format!("Failed to write to file: {}", self.file_path.display())
+        })?;
+
         Ok(())
     }
 }

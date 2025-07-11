@@ -43,3 +43,12 @@ pub struct DBState {
     pub epics:        HashMap<u32, Epic>,
     pub stories:      HashMap<u32, Story>,
 }
+impl DBState {
+    pub fn new() -> Self {
+        Self { last_item_id: 0, epics: HashMap::new(), stories: HashMap::new() }
+    }
+}
+
+impl Default for DBState {
+    fn default() -> Self { Self::new() }
+}
