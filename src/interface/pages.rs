@@ -108,7 +108,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn draw_page_should_not_throw_error() {
+        fn draw_page_should_not_fail() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
             let page = HomePage { db };
@@ -116,7 +116,7 @@ mod tests {
         }
 
         #[test]
-        fn handle_input_should_not_throw_error() {
+        fn handle_input_should_not_fail() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
             let page = HomePage { db };
@@ -158,7 +158,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn draw_page_should_not_throw_error() {
+        fn draw_page_should_not_fail() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
             let epic_id = db.create_epic(Epic::new("".to_string(), "".to_string())).unwrap();
 
@@ -167,7 +167,7 @@ mod tests {
         }
 
         #[test]
-        fn handle_input_should_not_throw_error() {
+        fn handle_input_should_not_fail() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
             let epic_id = db.create_epic(Epic::new("".to_string(), "".to_string())).unwrap();
 
@@ -176,7 +176,7 @@ mod tests {
         }
 
         #[test]
-        fn draw_page_should_throw_error_for_invalid_epic_id() {
+        fn draw_page_should_fail_for_invalid_epic_id() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
             let page = EpicDetail { epic_id: 999, db };
@@ -224,7 +224,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn draw_page_should_not_throw_error() {
+        fn draw_page_should_not_fail() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
             let epic_id = db.create_epic(Epic::new("".to_string(), "".to_string())).unwrap();
@@ -236,7 +236,7 @@ mod tests {
         }
 
         #[test]
-        fn handle_input_should_not_throw_error() {
+        fn handle_input_should_not_fail() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
             let epic_id = db.create_epic(Epic::new("".to_string(), "".to_string())).unwrap();
@@ -248,7 +248,7 @@ mod tests {
         }
 
         #[test]
-        fn draw_page_should_throw_error_for_invalid_story_id() {
+        fn draw_page_should_fail_for_invalid_story_id() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
             let epic_id = db.create_epic(Epic::new("".to_string(), "".to_string())).unwrap();

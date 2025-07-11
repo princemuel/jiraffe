@@ -25,25 +25,20 @@ pub enum Status {
     Resolved,
 }
 
-impl fmt::Display for Status {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Open => {
-                write!(f, "OPEN")
-            },
-            Self::InProgress => {
-                write!(f, "IN PROGRESS")
-            },
-            Self::Resolved => {
-                write!(f, "RESOLVED")
-            },
-            Self::Closed => {
-                write!(f, "CLOSED")
-            },
+impl From<&Status> for &'static str {
+    fn from(status: &Status) -> Self {
+        match status {
+            Status::Open => "OPEN",
+            Status::InProgress => "IN PROGRESS",
+            Status::Resolved => "RESOLVED",
+            Status::Closed => "CLOSED",
         }
     }
 }
 
+impl fmt::Display for Status {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.write_str(self.into()) }
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Epic {
     pub name:        String,
