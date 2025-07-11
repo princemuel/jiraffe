@@ -5,10 +5,7 @@
       "name": "Epic - Project 1",
       "description": "This is Project 1 for the Bootcamp",
       "status": "InProgress",
-      "stories": [
-        2,
-        3
-      ]
+      "stories": [2, 3]
     }
   },
   "stories": {

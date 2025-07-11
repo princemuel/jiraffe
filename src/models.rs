@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 pub enum Status {
     Closed,
     Open,
@@ -32,6 +34,6 @@ impl Story {
 
 pub struct DBState {
     pub last_item_id: u32,
-    pub epics:        Vec<Epic>,
-    pub stories:      Vec<Story>,
+    pub epics:        HashMap<u32, Epic>,
+    pub stories:      HashMap<u32, Story>,
 }
