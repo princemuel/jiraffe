@@ -1,6 +1,7 @@
+use std::any::Any;
 use std::rc::Rc;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use itertools::Itertools;
 
 use crate::database::JiraDatabase;
@@ -10,92 +11,193 @@ mod helpers;
 use helpers::*;
 
 pub trait Page {
+    fn as_any(&self) -> &dyn Any;
     fn draw_page(&self) -> Result<()>;
     fn handle_input(&self, input: &str) -> Result<Option<Action>>;
 }
 
+const EPIC_TABLE_HEADER: &str =
+    "----------------------------- EPICS ------------------------------";
+const STORY_TABLE_HEADER: &str =
+    "---------------------------- STORIES -----------------------------";
+const EPIC_DETAIL_HEADER: &str =
+    "------------------------------ EPIC ------------------------------";
+const STORY_DETAIL_HEADER: &str =
+    "------------------------------ STORY -----------------------------";
+
+const EPIC_COLUMN_HEADER: &str =
+    "     id     |               name               |      status      ";
+const STORY_COLUMN_HEADER: &str =
+    "     id     |               name               |      status      ";
+const DETAIL_COLUMN_HEADER: &str =
+    "  id  |     name     |         description         |    status    ";
+
+fn print_table_row(
+    id: u32,
+    name: &str,
+    status: &str,
+    id_width: usize,
+    name_width: usize,
+    status_width: usize,
+) {
+    let id_col = get_column_string(&id.to_string(), id_width);
+    let name_col = get_column_string(name, name_width);
+    let status_col = get_column_string(status, status_width);
+    println!("{id_col} | {name_col} | {status_col}");
+}
+
+fn print_detail_row(id: u32, name: &str, description: &str, status: &str) {
+    let id_col = get_column_string(&id.to_string(), 5);
+    let name_col = get_column_string(name, 12);
+    let desc_col = get_column_string(description, 27);
+    let status_col = get_column_string(status, 13);
+    println!("{id_col} | {name_col} | {desc_col} | {status_col}");
+}
+
 pub struct HomePage {
-    pub db: Rc<JiraDatabase>,
+    pub database: Rc<JiraDatabase>,
 }
 impl Page for HomePage {
     fn draw_page(&self) -> Result<()> {
-        println!("----------------------------- EPICS -----------------------------");
-        println!("     id     |               name               |      status      ");
+        println!("{EPIC_TABLE_HEADER}");
+        println!("{EPIC_COLUMN_HEADER}");
 
-        println!();
-        println!();
+        let db_state = self.database.read().context("Failed to read from database")?;
 
-        println!("[q] quit | [c] create epic | [:id:] navigate to epic");
+        db_state.epics.iter().sorted_by_key(|(id, _)| *id).for_each(|(id, epic)| {
+            print_table_row(*id, &epic.name, &epic.status.to_string(), 11, 32, 17);
+        });
 
+        println!("\n\n[q] quit | [c] create epic | [:id:] navigate to epic");
         Ok(())
     }
 
-    fn handle_input(&self, input: &str) -> Result<Option<Action>> { todo!() }
+    fn handle_input(&self, input: &str) -> Result<Option<Action>> {
+        match input {
+            "q" => Ok(Some(Action::Exit)),
+            "c" => Ok(Some(Action::CreateEpic)),
+            input => match input.parse::<u32>() {
+                Ok(epic_id) => {
+                    let db_state =
+                        self.database.read().context("Failed to read from database")?;
+                    if db_state.epics.contains_key(&epic_id) {
+                        Ok(Some(Action::NavigateToEpicDetail { epic_id }))
+                    } else {
+                        Ok(None)
+                    }
+                },
+                Err(_) => Ok(None),
+            },
+        }
+    }
+
+    fn as_any(&self) -> &dyn Any { self }
 }
 
 pub struct EpicDetail {
-    pub epic_id: u32,
-    pub db:      Rc<JiraDatabase>,
+    pub epic_id:  u32,
+    pub database: Rc<JiraDatabase>,
 }
 
 impl Page for EpicDetail {
     fn draw_page(&self) -> Result<()> {
-        let db_state = self.db.read()?;
+        let db_state = self.database.read().context("Failed to read from database")?;
         let epic = db_state
             .epics
             .get(&self.epic_id)
             .ok_or_else(|| anyhow!("Epic with id {} not found!", &self.epic_id))?;
 
-        println!("------------------------------ EPIC ------------------------------");
-        println!("  id  |     name     |         description         |    status    ");
+        println!("{EPIC_DETAIL_HEADER}");
+        println!("{DETAIL_COLUMN_HEADER}");
+        print_detail_row(self.epic_id, &epic.name, &epic.description, &epic.status.to_string());
 
         println!();
 
-        println!("---------------------------- STORIES ----------------------------");
-        println!("     id     |               name               |      status      ");
+        println!("{STORY_TABLE_HEADER}");
+        println!("{STORY_COLUMN_HEADER}");
 
-        let stories = &db_state.stories;
-
-        println!();
-        println!();
+        epic.stories
+            .iter()
+            .sorted()
+            .filter_map(|id| db_state.stories.get(id).map(|story| (*id, story)))
+            .for_each(|(id, story)| {
+                print_table_row(id, &story.name, &story.status.to_string(), 11, 32, 17);
+            });
 
         println!(
-            "[p] previous | [u] update epic | [d] delete epic | [c] create story | [:id:] \
+            "\n\n[p] previous | [u] update epic | [d] delete epic | [c] create story | [:id:] \
              navigate to story"
         );
-
         Ok(())
     }
 
-    fn handle_input(&self, input: &str) -> Result<Option<Action>> { todo!() }
+    fn handle_input(&self, input: &str) -> Result<Option<Action>> {
+        match input {
+            "p" => Ok(Some(Action::NavigateToPreviousPage)),
+            "u" => Ok(Some(Action::UpdateEpicStatus { epic_id: self.epic_id })),
+            "d" => Ok(Some(Action::DeleteEpic { epic_id: self.epic_id })),
+            "c" => Ok(Some(Action::CreateStory { epic_id: self.epic_id })),
+            input => match input.parse::<u32>() {
+                Ok(story_id) => {
+                    let db_state =
+                        self.database.read().context("Failed to read from database")?;
+                    if db_state.stories.contains_key(&story_id) {
+                        Ok(Some(Action::NavigateToStoryDetail {
+                            epic_id: self.epic_id,
+                            story_id,
+                        }))
+                    } else {
+                        Ok(None)
+                    }
+                },
+                Err(_) => Ok(None),
+            },
+        }
+    }
+
+    fn as_any(&self) -> &dyn Any { self }
 }
 
 pub struct StoryDetail {
     pub epic_id:  u32,
     pub story_id: u32,
-    pub db:       Rc<JiraDatabase>,
+    pub database: Rc<JiraDatabase>,
 }
 
 impl Page for StoryDetail {
     fn draw_page(&self) -> Result<()> {
-        let db_state = self.db.read()?;
+        let db_state = self.database.read().context("Failed to read from database")?;
         let story = db_state
             .stories
             .get(&self.story_id)
-            .ok_or_else(|| anyhow!("Story with id {} not found!", &self.story_id))?;
+            .ok_or_else(|| anyhow!("Story with id {} not found!", self.story_id))?;
 
-        println!("------------------------------ STORY ------------------------------");
-        println!("  id  |     name     |         description         |    status    ");
+        println!("{STORY_DETAIL_HEADER}");
+        println!("{DETAIL_COLUMN_HEADER}");
+        print_detail_row(
+            self.story_id,
+            &story.name,
+            &story.description,
+            &story.status.to_string(),
+        );
 
-        println!();
-        println!();
-
-        println!("[p] previous | [u] update story | [d] delete story");
-
+        println!("\n\n[p] previous | [u] update story | [d] delete story");
         Ok(())
     }
 
-    fn handle_input(&self, input: &str) -> Result<Option<Action>> { todo!() }
+    fn handle_input(&self, input: &str) -> Result<Option<Action>> {
+        match input {
+            "p" => Ok(Some(Action::NavigateToPreviousPage)),
+            "u" => Ok(Some(Action::UpdateStoryStatus { story_id: self.story_id })),
+            "d" => Ok(Some(Action::DeleteStory {
+                epic_id:  self.epic_id,
+                story_id: self.story_id,
+            })),
+            _ => Ok(None),
+        }
+    }
+
+    fn as_any(&self) -> &dyn Any { self }
 }
 
 #[cfg(test)]
@@ -111,7 +213,7 @@ mod tests {
         fn draw_page_should_not_fail() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
-            let page = HomePage { db };
+            let page = HomePage { database: db };
             assert!(page.draw_page().is_ok());
         }
 
@@ -119,7 +221,7 @@ mod tests {
         fn handle_input_should_not_fail() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
-            let page = HomePage { db };
+            let page = HomePage { database: db };
             assert!(page.handle_input("").is_ok());
         }
 
@@ -131,7 +233,7 @@ mod tests {
 
             let epic_id = db.create_epic(epic).unwrap();
 
-            let page = HomePage { db };
+            let page = HomePage { database: db };
 
             let q = "q";
             let c = "c";
@@ -162,7 +264,7 @@ mod tests {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
             let epic_id = db.create_epic(Epic::new("".to_string(), "".to_string())).unwrap();
 
-            let page = EpicDetail { epic_id, db };
+            let page = EpicDetail { epic_id, database: db };
             assert!(page.draw_page().is_ok());
         }
 
@@ -171,7 +273,7 @@ mod tests {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
             let epic_id = db.create_epic(Epic::new("".to_string(), "".to_string())).unwrap();
 
-            let page = EpicDetail { epic_id, db };
+            let page = EpicDetail { epic_id, database: db };
             assert!(page.handle_input("").is_ok());
         }
 
@@ -179,7 +281,7 @@ mod tests {
         fn draw_page_should_fail_for_invalid_epic_id() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
-            let page = EpicDetail { epic_id: 999, db };
+            let page = EpicDetail { epic_id: 999, database: db };
             assert!(page.draw_page().is_err());
         }
 
@@ -191,7 +293,7 @@ mod tests {
             let story_id =
                 db.create_story(Story::new("".to_string(), "".to_string()), epic_id).unwrap();
 
-            let page = EpicDetail { epic_id, db };
+            let page = EpicDetail { epic_id, database: db };
 
             let p = "p";
             let u = "u";
@@ -231,7 +333,7 @@ mod tests {
             let story_id =
                 db.create_story(Story::new("".to_string(), "".to_string()), epic_id).unwrap();
 
-            let page = StoryDetail { epic_id, story_id, db };
+            let page = StoryDetail { epic_id, story_id, database: db };
             assert!(page.draw_page().is_ok());
         }
 
@@ -243,7 +345,7 @@ mod tests {
             let story_id =
                 db.create_story(Story::new("".to_string(), "".to_string()), epic_id).unwrap();
 
-            let page = StoryDetail { epic_id, story_id, db };
+            let page = StoryDetail { epic_id, story_id, database: db };
             assert!(page.handle_input("").is_ok());
         }
 
@@ -255,7 +357,7 @@ mod tests {
             let _ =
                 db.create_story(Story::new("".to_string(), "".to_string()), epic_id).unwrap();
 
-            let page = StoryDetail { epic_id, story_id: 999, db };
+            let page = StoryDetail { epic_id, story_id: 999, database: db };
             assert!(page.draw_page().is_err());
         }
 
@@ -267,7 +369,7 @@ mod tests {
             let story_id =
                 db.create_story(Story::new("".to_string(), "".to_string()), epic_id).unwrap();
 
-            let page = StoryDetail { epic_id, story_id, db };
+            let page = StoryDetail { epic_id, story_id, database: db };
 
             let p = "p";
             let u = "u";

@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{Context, Ok, Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 
 use crate::models::{DBState, Epic, Status, Story};
 
