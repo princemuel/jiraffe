@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +18,7 @@ pub enum Action {
     Exit,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Status {
     Closed,
     Open,
@@ -32,6 +33,34 @@ impl From<&Status> for &'static str {
             Status::InProgress => "IN PROGRESS",
             Status::Resolved => "RESOLVED",
             Status::Closed => "CLOSED",
+        }
+    }
+}
+
+impl FromStr for Status {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim() {
+            "1" => Ok(Status::Open),
+            "2" => Ok(Status::InProgress),
+            "3" => Ok(Status::Resolved),
+            "4" => Ok(Status::Closed),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<u8> for Status {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(Status::Open),
+            2 => Ok(Status::InProgress),
+            3 => Ok(Status::Resolved),
+            4 => Ok(Status::Closed),
+            _ => Err(()),
         }
     }
 }
