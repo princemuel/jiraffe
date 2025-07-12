@@ -1,4 +1,4 @@
-use crate::io_utils::get_input;
+use crate::io::read_line;
 use crate::models::{Epic, Status, Story};
 
 pub struct Prompts {
@@ -29,19 +29,19 @@ fn create_epic_prompt() -> Epic {
     println!("----------------------------");
 
     println!("Epic Name: ");
-    let epic_name = get_input();
+    let epic_name = read_line();
 
     println!("Epic Description: ");
-    let epic_desc = get_input();
+    let epic_desc = read_line();
 
     Epic::new(epic_name.trim().to_string(), epic_desc.trim().to_string())
 }
 fn create_story_prompt() -> Story {
     println!("Story Name: ");
-    let story_name = get_input();
+    let story_name = read_line();
 
     println!("Story Description: ");
-    let story_desc = get_input();
+    let story_desc = read_line();
 
     Story::new(story_name.trim().to_string(), story_desc.trim().to_string())
 }
@@ -53,19 +53,19 @@ fn delete_epic_prompt() -> bool {
          deleted [Y/n]: "
     );
 
-    get_input().trim().eq("Y")
+    read_line().trim().eq("Y")
 }
 
 fn delete_story_prompt() -> bool {
     println!("----------------------------");
     println!("Are you sure you want to delete this story? [Y/n]: ");
 
-    get_input().trim().eq("Y")
+    read_line().trim().eq("Y")
 }
 
 fn update_status_prompt() -> Option<Status> {
     println!("----------------------------");
     println!("New Status (1 - OPEN, 2 - IN-PROGRESS, 3 - RESOLVED, 4 - CLOSED): ");
 
-    get_input().parse().ok()
+    read_line().parse().ok()
 }
