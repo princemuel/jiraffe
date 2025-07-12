@@ -53,14 +53,14 @@ fn delete_epic_prompt() -> bool {
          deleted [Y/n]: "
     );
 
-    read_line().trim().eq("Y")
+    read_line().trim().to_lowercase().eq("y")
 }
 
 fn delete_story_prompt() -> bool {
     println!("----------------------------");
     println!("Are you sure you want to delete this story? [Y/n]: ");
 
-    read_line().trim().eq("Y")
+    read_line().trim().to_lowercase().eq("y")
 }
 
 fn update_status_prompt() -> Option<Status> {
