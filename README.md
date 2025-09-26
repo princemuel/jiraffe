@@ -4,6 +4,8 @@ Jiraffe is a [Jira][jira] clone for the terminal.
 
 [jira]: https://www.atlassian.com/software/jira
 
+N/B: I plan to reimplement this app using one of the Rust TUI crates.
+
 ## Features
 
 - Epic CRUD
